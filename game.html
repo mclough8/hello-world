@@ -2,50 +2,102 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>Meteor Dodge</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>Oakvale RPG</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#050814;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none}
-  canvas{display:block;width:100vw;height:100vh}
-  #hud{position:fixed;inset:0;pointer-events:none;display:flex;justify-content:space-between;align-items:flex-start;padding:16px;box-sizing:border-box;font-weight:800;text-shadow:0 2px 8px #000}
-  #score{font-size:22px} #best{font-size:14px;opacity:.8;text-align:right}
-  #overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:linear-gradient(#050814aa,#050814dd);padding:24px;text-align:center}
-  .card{max-width:430px;background:#0c1330e8;border:1px solid #ffffff22;border-radius:22px;padding:28px;box-shadow:0 20px 60px #0008}
-  h1{margin:0 0 8px;font-size:42px} p{line-height:1.45;opacity:.9}
-  button{font:inherit;font-weight:900;font-size:18px;border:0;border-radius:14px;padding:14px 24px;background:#fff;color:#071020;cursor:pointer;pointer-events:auto;position:relative;z-index:10}
-  .tiny{font-size:13px;opacity:.65;margin-top:12px}
+  :root{--panel:#2b2418;--panel2:#463a26;--gold:#e6c56b;--ink:#f6eed0}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#111;color:var(--ink);font-family:Georgia,serif;touch-action:none}
+  #game{display:block;width:100vw;height:100vh;background:#547d3d}
+  #top{position:fixed;left:10px;right:10px;top:max(10px,env(safe-area-inset-top));display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+  .pill{background:#1b160fcc;border:2px solid #8f7543;border-radius:9px;padding:7px 10px;box-shadow:0 3px 8px #0008;font:700 14px system-ui;color:#fff}
+  #msg{position:fixed;left:50%;bottom:145px;transform:translateX(-50%);background:#15110ddd;border:1px solid #a58b55;border-radius:8px;padding:8px 12px;max-width:82vw;text-align:center;font:600 14px system-ui;opacity:0;transition:.2s;pointer-events:none}
+  #bottom{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));height:124px;display:flex;gap:8px;pointer-events:none}
+  .panel{background:linear-gradient(#51442d,#2b2418);border:3px ridge #a98c52;border-radius:7px;box-shadow:0 4px 14px #000a;pointer-events:auto}
+  #inv{flex:1;padding:6px;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:4px;min-width:0}
+  .slot{background:#201a12;border:1px solid #6e5b38;border-radius:4px;display:flex;align-items:center;justify-content:center;position:relative;font-size:24px;user-select:none}
+  .qty{position:absolute;right:3px;bottom:1px;font:700 11px system-ui;color:#fff;text-shadow:0 1px 2px #000}
+  #skills{width:124px;padding:7px;font:700 12px system-ui;line-height:1.45}
+  #actions{width:92px;display:flex;flex-direction:column;padding:5px;gap:5px}
+  button{flex:1;background:linear-gradient(#6e5b38,#3d321f);border:2px outset #a78b54;border-radius:5px;color:white;font:700 11px system-ui}
+  button:active{border-style:inset;transform:translateY(1px)}
+  #help{position:fixed;inset:0;background:#090806dd;display:grid;place-items:center;padding:22px;z-index:5}
+  #help .box{max-width:430px;background:linear-gradient(#51442d,#2b2418);border:4px ridge #b69a60;border-radius:9px;padding:20px;text-align:center;box-shadow:0 15px 50px #000}
+  h1{margin:0 0 8px;color:var(--gold);font-size:34px} p{font:15px/1.45 system-ui;margin:8px 0 15px}.start{width:100%;height:48px;font-size:17px}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="hud"><div id="score">0</div><div id="best">BEST 0</div></div>
-<div id="overlay"><div class="card"><h1>☄️ Meteor Dodge</h1><p>Move left and right. Dodge the meteors as long as you can. The game speeds up over time.</p><button id="start">PLAY</button><div class="tiny">Desktop: A / D or ← / → · Phone: drag anywhere</div></div></div>
+<div id="top"><div class="pill" id="hp">❤ 20 / 20</div><div class="pill" id="combat">Combat Lv. 3</div><div class="pill" id="coins">🪙 0</div></div>
+<div id="msg"></div>
+<div id="bottom">
+  <div class="panel" id="inv"></div>
+  <div class="panel" id="skills"></div>
+  <div class="panel" id="actions"><button id="eatBtn">EAT<br>🍎</button><button id="saveBtn">SAVE</button></div>
+</div>
+<div id="help"><div class="box"><h1>Oakvale RPG</h1><p>A tiny old-school browser RPG. Tap the ground to walk. Tap trees, rocks, enemies, or the fishing spot to interact. Gather resources, fight, gain XP, level skills, and collect loot.</p><button class="start" id="startBtn">ENTER OAKVALE</button></div></div>
 <script>
-const c=document.getElementById('game'),ctx=c.getContext('2d');
-const scoreEl=document.getElementById('score'),bestEl=document.getElementById('best'),overlay=document.getElementById('overlay'),startBtn=document.getElementById('start');
-let W,H,dpr,ship,rocks,stars,keys={},running=false,last=0,startTime=0,spawnTimer=0,best=+(localStorage.meteorBest||0),dragX=null;
-bestEl.textContent='BEST '+best;
-function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);stars=Array.from({length:Math.floor(W*H/7000)},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.3,s:Math.random()*20+10}));if(ship){ship.y=H-90;ship.x=Math.min(Math.max(ship.x,ship.r),W-ship.r)}}
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const invEl=document.getElementById('inv'),skillsEl=document.getElementById('skills'),hpEl=document.getElementById('hp'),combatEl=document.getElementById('combat'),coinsEl=document.getElementById('coins'),msgEl=document.getElementById('msg');
+let W=innerWidth,H=innerHeight,DPR=Math.min(devicePixelRatio||1,2),last=0,started=false,msgTimer=0;
+const world={w:1400,h:1000};
+const player={x:700,y:520,r:15,speed:155,targetX:700,targetY:520,hp:20,maxHp:20,attack:3,def:1,coins:0,inv:{log:0,ore:0,fish:0,apple:2,bones:0},xp:{combat:0,woodcutting:0,mining:0,fishing:0},lvl:{combat:1,woodcutting:1,mining:1,fishing:1},cool:0};
+const colors={grass:'#5f873f',grass2:'#6d944a',path:'#b89a62',water:'#4f8fa8',water2:'#65a9bf',tree:'#2d5c2b',trunk:'#6d4526',rock:'#77766f',enemy:'#728a34'};
+let objects=[];
+function add(type,x,y,name,extra={}){objects.push({type,x,y,name,alive:true,respawn:0,hp:extra.hp||1,maxHp:extra.hp||1,...extra})}
+for(let i=0;i<18;i++)add('tree',150+Math.random()*430,150+Math.random()*620,'Oak tree');
+for(let i=0;i<11;i++)add('rock',950+Math.random()*300,130+Math.random()*360,'Copper rock');
+for(let i=0;i<8;i++)add('enemy',830+Math.random()*360,600+Math.random()*260,'Marsh imp',{hp:8,maxHp:8,attack:2,phase:Math.random()*6});
+add('fish',250,820,'Fishing spot');
+add('shop',690,270,'Trader');
+function resize(){W=innerWidth;H=innerHeight;DPR=Math.min(devicePixelRatio||1,2);canvas.width=W*DPR;canvas.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0)}
 addEventListener('resize',resize);resize();
-function reset(){ship={x:W/2,y:H-90,r:18,v:430};rocks=[];startTime=performance.now();spawnTimer=0;last=startTime;scoreEl.textContent='0';running=true;overlay.style.display='none';requestAnimationFrame(loop)}
-startBtn.addEventListener('click', function(e){e.preventDefault();e.stopPropagation();reset();});
-startBtn.addEventListener('touchend', function(e){e.preventDefault();e.stopPropagation();reset();},{passive:false});
-addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(['arrowleft','arrowright',' '].includes(e.key.toLowerCase()))e.preventDefault()});
-addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-function pointer(e){dragX=e.touches?e.touches[0].clientX:e.clientX}
-addEventListener('touchstart',pointer,{passive:false});addEventListener('touchmove',e=>{pointer(e);e.preventDefault()},{passive:false});addEventListener('touchend',()=>dragX=null);
-addEventListener('pointerdown',e=>dragX=e.clientX);addEventListener('pointermove',e=>{if(e.buttons)dragX=e.clientX});addEventListener('pointerup',()=>dragX=null);
-function spawn(speed){let r=12+Math.random()*22;rocks.push({x:r+Math.random()*(W-r*2),y:-r,r,vy:speed*(.82+Math.random()*.4),rot:Math.random()*6.28,vr:(Math.random()-.5)*3});}
-function hit(a,b){let dx=a.x-b.x,dy=a.y-b.y,rr=a.r+b.r-5;return dx*dx+dy*dy<rr*rr}
-function end(score){running=false;if(score>best){best=score;localStorage.meteorBest=best;bestEl.textContent='BEST '+best}overlay.querySelector('h1').textContent='💥 Game Over';overlay.querySelector('p').innerHTML=`Score: <b>${score}</b><br>Best: <b>${best}</b>`;startBtn.textContent='PLAY AGAIN';overlay.style.display='grid'}
-function loop(t){if(!running)return;let dt=Math.min((t-last)/1000,.033);last=t;let elapsed=(t-startTime)/1000,score=Math.floor(elapsed*10),speed=190+elapsed*7,interval=Math.max(.18,.72-elapsed*.009);scoreEl.textContent=score;
-  if(keys.a||keys.arrowleft)ship.x-=ship.v*dt;if(keys.d||keys.arrowright)ship.x+=ship.v*dt;if(dragX!=null)ship.x+=(dragX-ship.x)*Math.min(1,dt*14);ship.x=Math.max(ship.r,Math.min(W-ship.r,ship.x));
-  spawnTimer+=dt;while(spawnTimer>interval){spawnTimer-=interval;spawn(speed)}
-  for(const r of rocks){r.y+=r.vy*dt;r.rot+=r.vr*dt;if(hit(ship,r))return end(score)}rocks=rocks.filter(r=>r.y-r.r<H+20);
-  ctx.clearRect(0,0,W,H);let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#071020');g.addColorStop(1,'#150720');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#ffffffaa';for(const s of stars){s.y+=s.s*dt;if(s.y>H)s.y=0;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fill()}
-  for(const r of rocks){ctx.save();ctx.translate(r.x,r.y);ctx.rotate(r.rot);ctx.fillStyle='#b6653a';ctx.beginPath();for(let i=0;i<9;i++){let a=i/9*Math.PI*2,rr=r.r*(.78+Math.sin(i*12.7)*.14);ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}ctx.closePath();ctx.fill();ctx.restore()}
-  ctx.save();ctx.translate(ship.x,ship.y);ctx.shadowBlur=20;ctx.shadowColor='#67e8f9';ctx.fillStyle='#eafcff';ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(18,19);ctx.lineTo(0,12);ctx.lineTo(-18,19);ctx.closePath();ctx.fill();ctx.fillStyle='#67e8f9';ctx.beginPath();ctx.moveTo(-8,16);ctx.lineTo(0,31+Math.random()*8);ctx.lineTo(8,16);ctx.closePath();ctx.fill();ctx.restore();requestAnimationFrame(loop)}
+function levelFor(xp){return Math.max(1,Math.floor(Math.sqrt(xp/35))+1)}
+function refreshLevels(){for(const k in player.lvl)player.lvl[k]=levelFor(player.xp[k]);player.attack=2+player.lvl.combat;player.maxHp=18+player.lvl.combat*2;player.hp=Math.min(player.hp,player.maxHp)}
+function notify(t){msgEl.textContent=t;msgEl.style.opacity=1;msgTimer=2.2}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function camera(){return {x:Math.max(0,Math.min(world.w-W,player.x-W/2)),y:Math.max(0,Math.min(world.h-(H-130),player.y-(H-130)/2))}}
+function tap(clientX,clientY){if(!started)return;const cam=camera(),wx=clientX+cam.x,wy=clientY+cam.y;let nearest=null,nd=999;
+  for(const o of objects){if(!o.alive)continue;const d=Math.hypot(wx-o.x,wy-o.y);const hitR=o.type==='tree'?34:o.type==='rock'?30:o.type==='shop'?34:o.type==='fish'?45:26;if(d<hitR&&d<nd){nearest=o;nd=d}}
+  if(nearest){interact(nearest)}else{player.targetX=Math.max(20,Math.min(world.w-20,wx));player.targetY=Math.max(20,Math.min(world.h-20,wy))}}
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();tap(e.clientX,e.clientY)});
+function approach(o,range=48){if(dist(player,o)>range){const ang=Math.atan2(o.y-player.y,o.x-player.x);player.targetX=o.x-Math.cos(ang)*range*.75;player.targetY=o.y-Math.sin(ang)*range*.75;return false}return true}
+function interact(o){if(!approach(o,o.type==='tree'?58:52)){player.pending=o;return}doAction(o)}
+function gain(skill,n){const before=player.lvl[skill];player.xp[skill]+=n;refreshLevels();if(player.lvl[skill]>before)notify(skill[0].toUpperCase()+skill.slice(1)+' level is now '+player.lvl[skill]+'!')}
+function doAction(o){player.pending=null;if(!o.alive)return;
+ if(o.type==='tree'){player.inv.log++;gain('woodcutting',20);notify('You chop some logs.');deplete(o,5)}
+ else if(o.type==='rock'){player.inv.ore++;gain('mining',22);notify('You mine some copper ore.');deplete(o,6)}
+ else if(o.type==='fish'){if(Math.random()<.78){player.inv.fish++;gain('fishing',18);notify('You catch a river fish.')}else notify('The fish slips away.')}
+ else if(o.type==='shop'){const sell=player.inv.log*2+player.inv.ore*3+player.inv.fish*4+player.inv.bones; if(sell){player.coins+=sell;player.inv.log=player.inv.ore=player.inv.fish=player.inv.bones=0;notify('Trader buys your goods for '+sell+' coins.')}else if(player.coins>=5){player.coins-=5;player.inv.apple++;notify('You buy an apple for 5 coins.')}else notify('Bring me logs, ore, fish, or bones. I also sell apples for 5 coins.')}
+ else if(o.type==='enemy')attackEnemy(o);renderUI()}
+function attackEnemy(o){if(player.cool>0)return;if(dist(player,o)>55){interact(o);return}player.cool=.75;const hit=Math.max(1,player.attack+Math.floor(Math.random()*3)-1);o.hp-=hit;notify('You hit the '+o.name+' for '+hit+'.');gain('combat',10);if(o.hp<=0){o.alive=false;o.respawn=8;o.hp=o.maxHp;player.coins+=2+Math.floor(Math.random()*4);player.inv.bones++;gain('combat',18);notify('The '+o.name+' is defeated!')}else{setTimeout(()=>{if(o.alive&&dist(player,o)<75){const dmg=Math.max(1,o.attack-Math.floor(player.def/2));player.hp-=dmg;notify('The '+o.name+' hits you for '+dmg+'.');if(player.hp<=0){player.hp=player.maxHp;player.x=700;player.y=520;player.targetX=player.x;player.targetY=player.y;player.coins=Math.floor(player.coins*.75);notify('You wake up in Oakvale, missing some coins.')}renderUI()}},350)}renderUI()}
+function deplete(o,sec){o.alive=false;o.respawn=sec}
+function update(dt){player.cool=Math.max(0,player.cool-dt);if(msgTimer>0){msgTimer-=dt;if(msgTimer<=0)msgEl.style.opacity=0}
+ const dx=player.targetX-player.x,dy=player.targetY-player.y,d=Math.hypot(dx,dy);if(d>2){const step=Math.min(d,player.speed*dt);player.x+=dx/d*step;player.y+=dy/d*step}
+ if(player.pending&&dist(player,player.pending)<60)doAction(player.pending);
+ for(const o of objects){if(!o.alive){o.respawn-=dt;if(o.respawn<=0)o.alive=true}if(o.type==='enemy'&&o.alive){o.phase+=dt;const dd=dist(player,o);if(dd<170&&dd>60){const ang=Math.atan2(player.y-o.y,player.x-o.x);o.x+=Math.cos(ang)*18*dt;o.y+=Math.sin(ang)*18*dt}}}}
+function drawGround(cam){ctx.fillStyle=colors.grass;ctx.fillRect(0,0,W,H-130);for(let y=-cam.y%48;y<H-130;y+=48)for(let x=-cam.x%48;x<W;x+=48){if(((x+cam.x)/48+(y+cam.y)/48)%2<1){ctx.fillStyle='#ffffff08';ctx.fillRect(x,y,48,48)}}
+ ctx.fillStyle=colors.path;ctx.fillRect(560-cam.x,0-cam.y,250,1000);ctx.fillRect(0-cam.x,455-cam.y,1400,150);
+ ctx.fillStyle=colors.water;ctx.fillRect(0-cam.x,750-cam.y,500,250);ctx.fillStyle=colors.water2;for(let y=770;y<990;y+=35){ctx.fillRect(-cam.x,y-cam.y,500,3)}
+ ctx.fillStyle='#9b8358';ctx.fillRect(620-cam.x,210-cam.y,140,100);ctx.fillStyle='#5f341f';ctx.fillRect(645-cam.x,245-cam.y,18,65);ctx.fillRect(710-cam.x,245-cam.y,18,65);ctx.fillStyle='#d5b26c';ctx.fillRect(610-cam.x,200-cam.y,160,50)}
+function drawObj(o,cam){if(!o.alive)return;const x=o.x-cam.x,y=o.y-cam.y;if(x<-60||x>W+60||y<-60||y>H-70)return;
+ ctx.save();ctx.translate(x,y);
+ if(o.type==='tree'){ctx.fillStyle=colors.trunk;ctx.fillRect(-7,5,14,28);ctx.fillStyle=colors.tree;for(const [a,b,r] of [[0,-14,23],[-16,-3,16],[16,-2,17]]){ctx.beginPath();ctx.arc(a,b,r,0,7);ctx.fill()}}
+ else if(o.type==='rock'){ctx.fillStyle=colors.rock;ctx.beginPath();ctx.moveTo(-24,18);ctx.lineTo(-16,-13);ctx.lineTo(3,-24);ctx.lineTo(23,-6);ctx.lineTo(20,20);ctx.closePath();ctx.fill();ctx.fillStyle='#bf7c45';ctx.beginPath();ctx.arc(2,-5,6,0,7);ctx.fill()}
+ else if(o.type==='enemy'){ctx.fillStyle=colors.enemy;ctx.beginPath();ctx.arc(0,0,18,0,7);ctx.fill();ctx.fillStyle='#20140b';ctx.fillRect(-9,-5,4,4);ctx.fillRect(5,-5,4,4);if(o.hp<o.maxHp){ctx.fillStyle='#300';ctx.fillRect(-20,-30,40,5);ctx.fillStyle='#c33';ctx.fillRect(-20,-30,40*(o.hp/o.maxHp),5)}}
+ else if(o.type==='fish'){ctx.strokeStyle='#d9f3ff';ctx.lineWidth=2;for(let i=0;i<3;i++){ctx.beginPath();ctx.arc((i-1)*14,Math.sin(i)*5,10,0,Math.PI);ctx.stroke()}}
+ else if(o.type==='shop'){ctx.fillStyle='#d4ad62';ctx.fillRect(-18,-20,36,40);ctx.fillStyle='#6b4026';ctx.fillRect(-12,-16,24,16);ctx.fillStyle='#111';ctx.font='20px system-ui';ctx.fillText('🪙',-11,8)}
+ ctx.restore()}
+function drawPlayer(cam){const x=player.x-cam.x,y=player.y-cam.y;ctx.save();ctx.translate(x,y);ctx.fillStyle='#222';ctx.beginPath();ctx.ellipse(0,16,14,6,0,0,7);ctx.fill();ctx.fillStyle='#d0a06d';ctx.beginPath();ctx.arc(0,-10,8,0,7);ctx.fill();ctx.fillStyle='#345a9a';ctx.fillRect(-10,-2,20,25);ctx.fillStyle='#7a4b2a';ctx.fillRect(-11,21,8,14);ctx.fillRect(3,21,8,14);ctx.strokeStyle='#d9d9d9';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(10,4);ctx.lineTo(23,-10);ctx.stroke();ctx.restore()}
+function drawLabels(cam){ctx.font='12px system-ui';ctx.textAlign='center';for(const o of objects){if(!o.alive)continue;if(['shop','fish'].includes(o.type)){ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.lineWidth=3;ctx.strokeText(o.name,o.x-cam.x,o.y-cam.y-32);ctx.fillText(o.name,o.x-cam.x,o.y-cam.y-32)}}ctx.textAlign='left'}
+function render(){const cam=camera();ctx.clearRect(0,0,W,H);drawGround(cam);for(const o of objects)drawObj(o,cam);drawPlayer(cam);drawLabels(cam)}
+function renderUI(){hpEl.textContent='❤ '+Math.max(0,player.hp)+' / '+player.maxHp;combatEl.textContent='Combat Lv. '+player.lvl.combat;coinsEl.textContent='🪙 '+player.coins;const slots=[['🪵',player.inv.log,'Logs'],['🪨',player.inv.ore,'Ore'],['🐟',player.inv.fish,'Fish'],['🍎',player.inv.apple,'Apple'],['🦴',player.inv.bones,'Bones'],['⚔️',player.attack,'Attack'],['🛡️',player.def,'Defense'],['🗺️','', 'Oakvale']];invEl.innerHTML=slots.map(s=>`<div class="slot" title="${s[2]}">${s[0]}<span class="qty">${s[1]}</span></div>`).join('');skillsEl.innerHTML=`Combat ${player.lvl.combat}<br>Woodcut ${player.lvl.woodcutting}<br>Mining ${player.lvl.mining}<br>Fishing ${player.lvl.fishing}<br><span style="opacity:.65">XP: ${player.xp.combat+player.xp.woodcutting+player.xp.mining+player.xp.fishing}</span>`}
+document.getElementById('eatBtn').onclick=()=>{if(player.inv.apple>0&&player.hp<player.maxHp){player.inv.apple--;player.hp=Math.min(player.maxHp,player.hp+7);notify('You eat an apple.');renderUI()}else notify(player.inv.apple?'You are already healthy.':'You have no apples.')};
+document.getElementById('saveBtn').onclick=()=>{localStorage.oakvaleSave=JSON.stringify({player});notify('Game saved on this device.')};
+function load(){try{const s=JSON.parse(localStorage.oakvaleSave||'null');if(s&&s.player){Object.assign(player,s.player);refreshLevels();notify('Save loaded.')}}catch(e){}}
+document.getElementById('startBtn').onclick=()=>{document.getElementById('help').style.display='none';started=true;load();renderUI();last=performance.now();requestAnimationFrame(loop)};
+function loop(t){const dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);render();renderUI();requestAnimationFrame(loop)}
+renderUI();
 </script>
 </body>
 </html>
