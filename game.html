@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Meteor Dodge</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#050814;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none}
+  canvas{display:block;width:100vw;height:100vh}
+  #hud{position:fixed;inset:0;pointer-events:none;display:flex;justify-content:space-between;align-items:flex-start;padding:16px;box-sizing:border-box;font-weight:800;text-shadow:0 2px 8px #000}
+  #score{font-size:22px} #best{font-size:14px;opacity:.8;text-align:right}
+  #overlay{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(#050814aa,#050814dd);padding:24px;text-align:center}
+  .card{max-width:430px;background:#0c1330e8;border:1px solid #ffffff22;border-radius:22px;padding:28px;box-shadow:0 20px 60px #0008}
+  h1{margin:0 0 8px;font-size:42px} p{line-height:1.45;opacity:.9}
+  button{font:inherit;font-weight:900;font-size:18px;border:0;border-radius:14px;padding:14px 24px;background:#fff;color:#071020;cursor:pointer;pointer-events:auto}
+  .tiny{font-size:13px;opacity:.65;margin-top:12px}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><div id="score">0</div><div id="best">BEST 0</div></div>
+<div id="overlay"><div class="card"><h1>☄️ Meteor Dodge</h1><p>Move left and right. Dodge the meteors as long as you can. The game speeds up over time.</p><button id="start">PLAY</button><div class="tiny">Desktop: A / D or ← / → · Phone: drag anywhere</div></div></div>
+<script>
+const c=document.getElementById('game'),ctx=c.getContext('2d');
+const scoreEl=document.getElementById('score'),bestEl=document.getElementById('best'),overlay=document.getElementById('overlay'),startBtn=document.getElementById('start');
+let W,H,dpr,ship,rocks,stars,keys={},running=false,last=0,startTime=0,spawnTimer=0,best=+(localStorage.meteorBest||0),dragX=null;
+bestEl.textContent='BEST '+best;
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);stars=Array.from({length:Math.floor(W*H/7000)},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.3,s:Math.random()*20+10}));if(ship){ship.y=H-90;ship.x=Math.min(Math.max(ship.x,ship.r),W-ship.r)}}
+addEventListener('resize',resize);resize();
+function reset(){ship={x:W/2,y:H-90,r:18,v:430};rocks=[];startTime=performance.now();spawnTimer=0;last=startTime;scoreEl.textContent='0';running=true;overlay.style.display='none';requestAnimationFrame(loop)}
+startBtn.onclick=reset;
+addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(['arrowleft','arrowright',' '].includes(e.key.toLowerCase()))e.preventDefault()});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+function pointer(e){dragX=e.touches?e.touches[0].clientX:e.clientX}
+addEventListener('touchstart',pointer,{passive:false});addEventListener('touchmove',e=>{pointer(e);e.preventDefault()},{passive:false});addEventListener('touchend',()=>dragX=null);
+addEventListener('pointerdown',e=>dragX=e.clientX);addEventListener('pointermove',e=>{if(e.buttons)dragX=e.clientX});addEventListener('pointerup',()=>dragX=null);
+function spawn(speed){let r=12+Math.random()*22;rocks.push({x:r+Math.random()*(W-r*2),y:-r,r,vy:speed*(.82+Math.random()*.4),rot:Math.random()*6.28,vr:(Math.random()-.5)*3});}
+function hit(a,b){let dx=a.x-b.x,dy=a.y-b.y,rr=a.r+b.r-5;return dx*dx+dy*dy<rr*rr}
+function end(score){running=false;if(score>best){best=score;localStorage.meteorBest=best;bestEl.textContent='BEST '+best}overlay.querySelector('h1').textContent='💥 Game Over';overlay.querySelector('p').innerHTML=`Score: <b>${score}</b><br>Best: <b>${best}</b>`;startBtn.textContent='PLAY AGAIN';overlay.style.display='grid'}
+function loop(t){if(!running)return;let dt=Math.min((t-last)/1000,.033);last=t;let elapsed=(t-startTime)/1000,score=Math.floor(elapsed*10),speed=190+elapsed*7,interval=Math.max(.18,.72-elapsed*.009);scoreEl.textContent=score;
+  if(keys.a||keys.arrowleft)ship.x-=ship.v*dt;if(keys.d||keys.arrowright)ship.x+=ship.v*dt;if(dragX!=null)ship.x+=(dragX-ship.x)*Math.min(1,dt*14);ship.x=Math.max(ship.r,Math.min(W-ship.r,ship.x));
+  spawnTimer+=dt;while(spawnTimer>interval){spawnTimer-=interval;spawn(speed)}
+  for(const r of rocks){r.y+=r.vy*dt;r.rot+=r.vr*dt;if(hit(ship,r))return end(score)}rocks=rocks.filter(r=>r.y-r.r<H+20);
+  ctx.clearRect(0,0,W,H);let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#071020');g.addColorStop(1,'#150720');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#ffffffaa';for(const s of stars){s.y+=s.s*dt;if(s.y>H)s.y=0;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fill()}
+  for(const r of rocks){ctx.save();ctx.translate(r.x,r.y);ctx.rotate(r.rot);ctx.fillStyle='#b6653a';ctx.beginPath();for(let i=0;i<9;i++){let a=i/9*Math.PI*2,rr=r.r*(.78+Math.sin(i*12.7)*.14);ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}ctx.closePath();ctx.fill();ctx.restore()}
+  ctx.save();ctx.translate(ship.x,ship.y);ctx.shadowBlur=20;ctx.shadowColor='#67e8f9';ctx.fillStyle='#eafcff';ctx.beginPath();ctx.moveTo(0,-24);ctx.lineTo(18,19);ctx.lineTo(0,12);ctx.lineTo(-18,19);ctx.closePath();ctx.fill();ctx.fillStyle='#67e8f9';ctx.beginPath();ctx.moveTo(-8,16);ctx.lineTo(0,31+Math.random()*8);ctx.lineTo(8,16);ctx.closePath();ctx.fill();ctx.restore();requestAnimationFrame(loop)}
+</script>
+</body>
+</html>
