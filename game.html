@@ -9,10 +9,10 @@
   canvas{display:block;width:100vw;height:100vh}
   #hud{position:fixed;inset:0;pointer-events:none;display:flex;justify-content:space-between;align-items:flex-start;padding:16px;box-sizing:border-box;font-weight:800;text-shadow:0 2px 8px #000}
   #score{font-size:22px} #best{font-size:14px;opacity:.8;text-align:right}
-  #overlay{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(#050814aa,#050814dd);padding:24px;text-align:center}
+  #overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:linear-gradient(#050814aa,#050814dd);padding:24px;text-align:center}
   .card{max-width:430px;background:#0c1330e8;border:1px solid #ffffff22;border-radius:22px;padding:28px;box-shadow:0 20px 60px #0008}
   h1{margin:0 0 8px;font-size:42px} p{line-height:1.45;opacity:.9}
-  button{font:inherit;font-weight:900;font-size:18px;border:0;border-radius:14px;padding:14px 24px;background:#fff;color:#071020;cursor:pointer;pointer-events:auto}
+  button{font:inherit;font-weight:900;font-size:18px;border:0;border-radius:14px;padding:14px 24px;background:#fff;color:#071020;cursor:pointer;pointer-events:auto;position:relative;z-index:10}
   .tiny{font-size:13px;opacity:.65;margin-top:12px}
 </style>
 </head>
@@ -28,7 +28,8 @@ bestEl.textContent='BEST '+best;
 function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;c.width=W*dpr;c.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);stars=Array.from({length:Math.floor(W*H/7000)},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.3,s:Math.random()*20+10}));if(ship){ship.y=H-90;ship.x=Math.min(Math.max(ship.x,ship.r),W-ship.r)}}
 addEventListener('resize',resize);resize();
 function reset(){ship={x:W/2,y:H-90,r:18,v:430};rocks=[];startTime=performance.now();spawnTimer=0;last=startTime;scoreEl.textContent='0';running=true;overlay.style.display='none';requestAnimationFrame(loop)}
-startBtn.onclick=reset;
+startBtn.addEventListener('click', function(e){e.preventDefault();e.stopPropagation();reset();});
+startBtn.addEventListener('touchend', function(e){e.preventDefault();e.stopPropagation();reset();},{passive:false});
 addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(['arrowleft','arrowright',' '].includes(e.key.toLowerCase()))e.preventDefault()});
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 function pointer(e){dragX=e.touches?e.touches[0].clientX:e.clientX}
