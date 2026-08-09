@@ -61,10 +61,11 @@
     erasing=!erasing;e.currentTarget.classList.toggle('active',erasing);applyTool();
   });
 
-  // The main drawing script resets the canvas and brush defaults between prompts.
-  // Reapply the user's selected tool whenever drawing starts.
   canvas.addEventListener('pointerdown',applyTool,{capture:true});
   canvas.addEventListener('touchstart',applyTool,{passive:true,capture:true});
-
   if(drawBtn)drawBtn.addEventListener('click',()=>setTimeout(()=>{canvas.scrollIntoView({block:'center',behavior:'smooth'});canvas.focus?.({preventScroll:true})},80));
+
+  const pairScript=document.createElement('script');
+  pairScript.src='./striplash-v16-pairfix.js?v=1';
+  document.body.appendChild(pairScript);
 })();
